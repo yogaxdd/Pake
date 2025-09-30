@@ -3,19 +3,28 @@ name: Build Pake macOS
 on:
   workflow_dispatch:
     inputs:
-      url: { description: "Website URL", required: true }
-      name: { description: "App Name", required: true }
-      icon: { description: "Icon URL (.icns) optional", required: false }
+      url:
+        description: "Website URL (contoh: https://web.whatsapp.com)"
+        required: true
+      name:
+        description: "App Name (contoh: Whatsapp)"
+        required: true
+      icon:
+        description: "Icon URL (.icns) optional"
+        required: false
 
 jobs:
   build-mac:
     runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
 
       - name: Setup Rust (for Tauri)
         uses: dtolnay/rust-toolchain@stable
@@ -25,16 +34,27 @@ jobs:
 
       - name: Build with Pake
         run: |
+          set -euxo pipefail
           if [ -z "${{ github.event.inputs.icon }}" ]; then
             pake "${{ github.event.inputs.url }}" --name "${{ github.event.inputs.name }}"
           else
             pake "${{ github.event.inputs.url }}" --name "${{ github.event.inputs.name }}" --icon "${{ github.event.inputs.icon }}"
           fi
+          echo "== List outputs =="
+          # lokasi standar output Tauri (arm64 macOS runner)
+          find src-tauri/target -maxdepth 6 -type f \( -name "*.dmg" -o -name "*.app" \) -print || true
+          # beberapa versi Pake nge-drop .dmg di root workspace juga
+          ls -la || true
 
-      - name: Upload artifacts
+      - name: Upload artifacts (.dmg & .app)
         uses: actions/upload-artifact@v4
         with:
           name: ${{ github.event.inputs.name }}-mac
+          # cover semua kemungkinan lokasi output
           path: |
-            dist/**/*.dmg
-            dist/**/*.app
+            src-tauri/target/**/bundle/dmg/*.dmg
+            src-tauri/target/**/bundle/macos/*.app
+            **/*.dmg
+            **/*.app
+          if-no-files-found: warn
+          retention-days: 7
