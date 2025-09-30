@@ -1,0 +1,50 @@
+name: Build Pake macOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Website URL"
+        required: true
+      name:
+        description: "App Name"
+        required: true
+      icon:
+        description: "Icon URL (.icns) optional"
+        required: false
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node + pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Rust (for Tauri)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install pake-cli
+        run: pnpm add -g pake-cli
+
+      - name: Build with Pake
+        run: |
+          if [ -z "${{ github.event.inputs.icon }}" ]; then
+            pake "${{ github.event.inputs.url }}" --name "${{ github.event.inputs.name }}"
+          else
+            pake "${{ github.event.inputs.url }}" --name "${{ github.event.inputs.name }}" --icon "${{ github.event.inputs.icon }}"
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.inputs.name }}-mac
+          path: |
+            dist/**/*.dmg
+            dist/**/*.app
